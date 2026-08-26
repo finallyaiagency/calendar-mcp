@@ -1,4 +1,4 @@
-# Ultra-minimal Vercel test - no app imports
+# Vercel serverless entry point for FastAPI
 import traceback
 import sys
 import os
@@ -15,15 +15,24 @@ except Exception as e:
     print(f"Failed to import FastAPI: {e}", file=sys.stderr)
     traceback.print_exc(file=sys.stderr)
 
-app = FastAPI()
-
-@app.get("/")
-async def root():
-    return {"message": "Minimal test works!", "service": "calendar-mcp"}
-
-@app.get("/health")
-async def health():
-    return {"status": "healthy", "service": "calendar-mcp"}
+# Import the full app
+try:
+    from app.main import app
+    print("Successfully imported app.main", file=sys.stderr)
+except Exception as e:
+    print(f"Failed to import app: {e}", file=sys.stderr)
+    traceback.print_exc(file=sys.stderr)
+    from fastapi import FastAPI
+    from fastapi.responses import JSONResponse
+    
+    app = FastAPI()
+    
+    @app.get("/")
+    async def root():
+        return JSONResponse(
+            status_code=500,
+            content={"error": "App import failed", "detail": str(e)}
+        )
 
 # Try Mangum
 try:
