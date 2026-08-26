@@ -15,27 +15,41 @@ except Exception as e:
     print(f"Failed to import FastAPI: {e}", file=sys.stderr)
     traceback.print_exc(file=sys.stderr)
 
-# Import the full app WITHOUT database dependencies first
-try:
-    print("Starting app imports (no DB)...", file=sys.stderr)
+# Create the app directly here to avoid any import issues
+app = FastAPI(title="Calendar MCP Server", version="0.1.0")
+
+# CORS middleware
+from fastapi.middleware.cors import CORSMiddleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Lazy-load routers
+def include_routers():
     from app.routers import auth, calendar, ics
-    print("app.routers imported", file=sys.stderr)
-    from app.main import app
-    print("Successfully imported app.main", file=sys.stderr)
-except Exception as e:
-    print(f"Failed to import app: {e}", file=sys.stderr)
-    traceback.print_exc(file=sys.stderr)
-    from fastapi import FastAPI
-    from fastapi.responses import JSONResponse
+    app.include_router(auth.router, prefix="/auth", tags=["auth"])
+    app.include_router(calendar.router, prefix="/calendar", tags=["calendar"])
+    app.include_router(ics.router, prefix="/ics", tags=["ics"])
     
-    app = FastAPI()
-    
-    @app.get("/")
-    async def root():
-        return JSONResponse(
-            status_code=500,
-            content={"error": "App import failed", "detail": str(e)}
-        )
+    try:
+        from app.mcp_server import mount_mcp
+        mount_mcp(app)
+    except ImportError:
+        pass
+
+include_routers()
+
+@app.get("/")
+async def root():
+    return {"message": "Calendar MCP Server is running"}
+
+@app.get("/health")
+async def health():
+    return {"status": "healthy", "service": "calendar-mcp"}
 
 # Try Mangum
 try:
