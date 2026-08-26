@@ -17,6 +17,9 @@ def get_engine():
             "DATABASE_URL",
             "postgresql://user:***@host/dbname"
         )
+        # Use pg8000 dialect for pure Python PostgreSQL driver
+        if SQLALCHEMY_DATABASE_URL.startswith("postgresql://"):
+            SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgresql://", "postgresql+pg8000://", 1)
         _engine = create_engine(
             SQLALCHEMY_DATABASE_URL,
             pool_pre_ping=True,
