@@ -4,12 +4,8 @@ MCP Server — Model Context Protocol endpoint for AI agents.
 This exposes read/write tools to authorized agents.
 """
 from fastapi import APIRouter
-from mcp.server import Server
-from mcp.types import Tool, TextContent
-from mcp.server.stdio import stdio_server
-import asyncio, json
 
-# NOTE: python-mcp package needed:
+# NOTE: python-mcp package needed for full MCP stdio server:
 # pip install mcp
 # See https://modelcontextprotocol.io for MCP spec.
 
@@ -150,7 +146,16 @@ async def run_mcp_stdio():
     """
     Run MCP server over stdio (for AI agents that connect via stdio transport).
     Entry point: python -m app.mcp_server
+    Requires: pip install mcp
     """
+    try:
+        from mcp.server import Server
+        from mcp.types import Tool, TextContent
+        from mcp.server.stdio import stdio_server
+    except ImportError:
+        print("MCP package not installed. Run: pip install mcp")
+        return
+
     server = Server(MCP_SERVER_NAME)
 
     @server.list_tools()
