@@ -15,17 +15,9 @@ except Exception as e:
     print(f"Failed to import FastAPI: {e}", file=sys.stderr)
     traceback.print_exc(file=sys.stderr)
 
-# Import the full app step by step
+# Import the full app WITHOUT database dependencies first
 try:
-    print("Starting app imports...", file=sys.stderr)
-    from app.database import Base, get_db
-    print("app.database imported", file=sys.stderr)
-    from app.models.user import User
-    print("app.models.user imported", file=sys.stderr)
-    from app.models.calendar import Calendar
-    print("app.models.calendar imported", file=sys.stderr)
-    from app.models.event import Event
-    print("app.models.event imported", file=sys.stderr)
+    print("Starting app imports (no DB)...", file=sys.stderr)
     from app.routers import auth, calendar, ics
     print("app.routers imported", file=sys.stderr)
     from app.main import app
