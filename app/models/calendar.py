@@ -9,8 +9,7 @@ class Calendar(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
     description = Column(String(1000), nullable=True)
-    color = Column(String(7), default="#3B82F6")  # Hex color for UI
-    # Calendar type: personal, family, business, trip, etc.
+    color = Column(String(7), default="#3B82F6")
     calendar_type = Column(String(50), default="personal")
     owner_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
