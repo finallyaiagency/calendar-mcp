@@ -27,7 +27,7 @@ def include_routers():
     except ImportError:
         pass  # MCP not installed, skip MCP integration
 
-# Include routers immediately for now (will lazy-load if needed)
+# Include routers immediately
 include_routers()
 
 @app.get("/")

@@ -1,17 +1,27 @@
 # app/routers/ics.py
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, status
-from sqlalchemy.orm import Session
 import icalendar
 from datetime import datetime, timezone
 from typing import List
 
-from app.database import get_db
-from app.models.event import Event
-from app.models.calendar import Calendar
-from app.routers.auth import get_current_user
-from app.models.user import User
-
 router = APIRouter()
+
+
+def get_db_dep():
+    from app.database import get_db
+    return get_db
+
+def get_event_model():
+    from app.models.event import Event
+    return Event
+
+def get_calendar_model():
+    from app.models.calendar import Calendar
+    return Calendar
+
+def get_current_user_dep():
+    from app.routers.auth import get_current_user
+    return get_current_user
 
 
 def parse_ics_content(file_content: bytes, calendar_id: int, db: Session):
@@ -21,23 +31,20 @@ def parse_ics_content(file_content: bytes, calendar_id: int, db: Session):
 
     for component in cal.walk():
         if component.name == "VEVENT":
+            Event = get_event_model()
             event = Event()
             event.calendar_id = calendar_id
 
-            # Title / Summary
             event.title = str(component.get('summary', 'Untitled Event'))
 
-            # Description
             desc = component.get('description')
             if desc:
                 event.description = str(desc)
 
-            # Location
             loc = component.get('location')
             if loc:
                 event.location = str(loc)
 
-            # Start / End
             dtstart = component.get('dtstart')
             dtend = component.get('dtend')
             if dtstart and dtstart.dt:
@@ -49,28 +56,22 @@ def parse_ics_content(file_content: bytes, calendar_id: int, db: Session):
                 if event.end_time.tzinfo is None:
                     event.end_time = event.end_time.replace(tzinfo=timezone.utc)
             else:
-                # Default 1-hour event if no end specified
                 event.end_time = event.start_time + __import__('datetime').timedelta(hours=1)
 
-            # All-day check
             event.all_day = isinstance(dtstart.dt, datetime) is False
 
-            # Recurrence
             rrule = component.get('rrule')
             if rrule:
                 event.rrule = str(rrule.to_ical())
 
-            # UID for stable reference
             uid = component.get('uid')
             if uid:
                 event.external_uid = str(uid)
 
-            # Status
             status_prop = component.get('status')
             if status_prop:
                 event.status = str(status_prop).lower()
 
-            # Store raw ICS snippet
             event.raw_ics = component.to_ical()
 
             db.add(event)
@@ -86,11 +87,11 @@ def parse_ics_content(file_content: bytes, calendar_id: int, db: Session):
 def upload_ics(
     calendar_id: int,
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    current_user = Depends(lambda: get_current_user_dep()),
+    db = Depends(lambda: get_db_dep())
 ):
     """Ingest an ICS file for a calendar."""
-    # Verify calendar ownership
+    Calendar = get_calendar_model()
     calendar = db.query(Calendar).filter(
         Calendar.id == calendar_id,
         Calendar.owner_id == current_user.id
@@ -108,3 +109,16 @@ def upload_ics(
         "events_ingested": len(events),
         "event_ids": [e.id for e in events]
     }
+
+
+def get_db_dep():
+    from app.database import get_db
+    return get_db
+
+def get_calendar_model():
+    from app.models.calendar import Calendar
+    return Calendar
+
+def get_current_user_dep():
+    from app.routers.auth import get_current_user
+    return get_current_user

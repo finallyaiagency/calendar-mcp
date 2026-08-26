@@ -7,11 +7,18 @@ from jose import jwt, JWTError
 from passlib.context import CryptContext
 import os
 
-from app.database import get_db
-from app.models.user import User
-from app.schemas.auth import (
-    Token, UserCreate, User as UserSchema
-)
+# Lazy imports - these will be imported inside functions
+def get_db_dep():
+    from app.database import get_db
+    return get_db
+
+def get_user_model():
+    from app.models.user import User
+    return User
+
+def get_schemas():
+    from app.schemas.auth import Token, UserCreate, User as UserSchema
+    return Token, UserCreate, UserSchema
 
 # Security configuration
 SECRET_KEY = os.getenv("SECRET_KEY", "CHANGE_ME_TO_A_SECURE_RANDOM_KEY")
@@ -44,6 +51,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
 
 
 def authenticate_user(db: Session, email: str, password: str):
+    User = get_user_model()
     user = db.query(User).filter(User.email == email).first()
     if not user:
         return False
@@ -52,20 +60,33 @@ def authenticate_user(db: Session, email: str, password: str):
     return user
 
 
-@router.post("/register", response_model=UserSchema)
-def register(user_data: UserCreate, db: Session = Depends(get_db)):
+@router.post("/register", response_model=lambda: get_schemas()[2])
+def register(user_data, db: Session = Depends(get_db_dep)):
     """Register a new user."""
-    existing_user = db.query(User).filter(User.email == user_data.email).first()
+    User = get_user_model()
+    Token, UserCreate, UserSchema = get_schemas()
+    
+    # Convert user_data if it's a dict
+    if hasattr(user_data, 'email'):
+        email = user_data.email
+        password = user_data.password
+        full_name = user_data.full_name
+    else:
+        email = user_data.get('email')
+        password = user_data.get('password')
+        full_name = user_data.get('full_name')
+    
+    existing_user = db.query(User).filter(User.email == email).first()
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered"
         )
-    hashed_password = get_password_hash(user_data.password)
+    hashed_password = get_password_hash(password)
     db_user = User(
-        email=user_data.email,
+        email=email,
         hashed_password=hashed_password,
-        full_name=user_data.full_name
+        full_name=full_name
     )
     db.add(db_user)
     db.commit()
@@ -85,10 +106,10 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
     return db_user
 
 
-@router.post("/login", response_model=Token)
+@router.post("/login", response_model=lambda: get_schemas()[0])
 def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db_dep)
 ):
     """Login and get access token."""
     user = authenticate_user(db, form_data.username, form_data.password)
@@ -98,6 +119,7 @@ def login(
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    Token, UserCreate, UserSchema = get_schemas()
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user.email, "user_id": user.id},
@@ -108,9 +130,10 @@ def login(
 
 def get_current_user(
     token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db_dep)
 ):
     """Dependency to get the current authenticated user from JWT token."""
+    User = get_user_model()
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
