@@ -34,3 +34,6 @@ except Exception as e:
     print(f"Mangum failed: {e}", file=sys.stderr)
     traceback.print_exc(file=sys.stderr)
     handler = app
+
+# Export handler explicitly for Vercel
+__all__ = ["handler", "app"]
